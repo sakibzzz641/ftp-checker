@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>FTP Scanner (simple)</title>
+  <style>
+    body{font-family:system-ui,Arial;margin:20px;max-width:900px}
+    textarea{width:100%;height:160px}
+    button{padding:8px 12px;margin-top:8px}
+    .ok{color:green}
+    .bad{color:#b22}
+    ul{padding-left:18px}
+  </style>
+</head>
+<body>
+  <h2>FTP Scanner</h2>
+  <p>Protita line-e ekta FTP host ba ftp:// URL likho (max 50). Tarpor <b>Scan</b> click koro.</p>
+  <textarea id="list" placeholder="ftp.example.com&#10;ftp://ftp.example2.com:21/path"></textarea>
+  <br>
+  <label>Backend API URL: <input id="api" value="https://your-backend.onrender.com/api/scan" style="width:60%"></label>
+  <br>
+  <button id="scan">Scan</button>
+  <div id="status"></div>
+
+  <h3>Supported</h3>
+  <ul id="supported"></ul>
+
+  <h3>Not supported</h3>
+  <ul id="notSupported"></ul>
+
+<script>
+document.getElementById('scan').addEventListener('click', async ()=>{
+  const raw = document.getElementById('list').value.trim();
+  const api = document.getElementById('api').value.trim();
+  if(!raw){ alert("Link likho"); return; }
+  if(!api){ alert("API URL dao"); return; }
+  const arr = raw.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).slice(0,50);
+  document.getElementById('status').textContent = "Scanning "+arr.length+"...";
+  document.getElementById('supported').innerHTML = "";
+  document.getElementById('notSupported').innerHTML = "";
+
+  try{
+    const res = await fetch(api, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({links: arr})
+    });
+    if(!res.ok) {
+      const text = await res.text();
+      document.getElementById('status').textContent = "API error: " + text;
+      return;
+    }
+    const j = await res.json();
+    document.getElementById('status').textContent = "Done. " + (j.results||[]).length + " checked.";
+
+    (j.results||[]).forEach(it=>{
+      const li = document.createElement('li');
+      li.textContent = `${it.input} — ${it.ok ? "Supported" : "Not supported"} (${it.reason}) ${it.time_ms ? it.time_ms+"ms":""}`;
+      if(it.ok) {
+        li.className = "ok";
+        // click to copy
+        li.onclick = ()=>{ navigator.clipboard?.writeText(it.input); alert("Copied: "+it.input); };
+      } else {
+        li.className = "bad";
+      }
+      (it.ok ? document.getElementById('supported') : document.getElementById('notSupported')).appendChild(li);
+    });
+
+  } catch(e){
+    document.getElementById('status').textContent = "Error: " + e.message;
+  }
+});
+</script>
+</body>
+</html>
